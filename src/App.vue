@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faFileExport, faFileImport, faImage, faLink, faPrint, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
 import SankeyDiagram from './components/SankeyDiagram.vue'
@@ -11,7 +11,7 @@ import { buildGraph } from './sankeyGraph'
 import { useDocumentText } from './store/document'
 import { exportPng } from './store/png'
 import { decodeShare, encodeShare, sharedFragment, shareUrl } from './store/share'
-import { exportYaml, importYaml } from './store/transfer'
+import { exportYaml, IMPORT_ACCEPT, importYaml } from './store/transfer'
 import { DEFAULT_CURRENCY_SYMBOL, DEFAULT_DECIMALS, FILE_EXTENSION, normalizeAmounts, parseDocument } from './yamlFormat'
 
 const text = useDocumentText()
@@ -64,16 +64,59 @@ async function onImport(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file) return
+  if (file) await importFile(file)
+}
+
+async function importFile(file: File) {
   importError.value = ''
   try {
     const content = await importYaml(file)
     parseDocument(content) // validate before replacing the editor content
     text.value = normalizeAmounts(content).text
+    showNotice(`„${file.name}“ importiert.`)
   } catch (err) {
     importError.value = err instanceof Error ? err.message : 'Import fehlgeschlagen.'
   }
 }
+
+// the whole page accepts dropped files; a counter tracks nested dragenter/dragleave pairs so the overlay doesn't flicker over child elements
+const dragDepth = ref(0)
+const dragging = computed(() => dragDepth.value > 0)
+const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false
+function onDragEnter(e: DragEvent) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  dragDepth.value++
+}
+function onDragOver(e: DragEvent) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+}
+function onDragLeave(e: DragEvent) {
+  if (!hasFiles(e)) return
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+}
+async function onDrop(e: DragEvent) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  dragDepth.value = 0
+  const file = e.dataTransfer?.files[0]
+  if (!file) return
+  if (!/\.(ya?ml|png)$/i.test(file.name)) {
+    importError.value = `„${file.name}“ ist weder eine YAML- noch eine PNG-Datei.`
+    return
+  }
+  await importFile(file)
+}
+const dragListeners: [keyof DocumentEventMap, (e: DragEvent) => void][] = [
+  ['dragenter', onDragEnter],
+  ['dragover', onDragOver],
+  ['dragleave', onDragLeave],
+  ['drop', onDrop],
+]
+onMounted(() => dragListeners.forEach(([type, listener]) => document.addEventListener(type, listener as EventListener)))
+onBeforeUnmount(() => dragListeners.forEach(([type, listener]) => document.removeEventListener(type, listener as EventListener)))
 
 function onExample() {
   if (text.value.trim() === '' || text.value === EXAMPLE_YAML || confirm('Aktuellen Inhalt durch das Beispiel ersetzen?')) text.value = EXAMPLE_YAML
@@ -87,7 +130,7 @@ async function onExportPng() {
     return
   }
   try {
-    await exportPng(svg)
+    await exportPng(svg, text.value)
   } catch (err) {
     importError.value = err instanceof Error ? err.message : 'PNG-Export fehlgeschlagen.'
   }
@@ -132,6 +175,12 @@ onMounted(async () => {
 </script>
 
 <template>
+  <div
+    v-if="dragging"
+    class="pointer-events-none fixed inset-0 z-10 flex items-center justify-center border-4 border-dashed border-sky-500 bg-sky-50/80 text-lg font-medium text-sky-700 print:hidden"
+  >
+    YAML- oder PNG-Datei hier ablegen
+  </div>
   <main class="mx-auto max-w-7xl p-6 print:max-w-none print:p-0">
     <header class="mb-6 flex flex-wrap items-center gap-3 print:hidden">
       <h1 class="text-2xl font-bold">Finanzen</h1>
@@ -139,10 +188,10 @@ onMounted(async () => {
         <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Beispiel laden" @click="onExample">
           <FontAwesomeIcon :icon="faWandMagicSparkles" class="mr-2 size-4" />Beispiel
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="`${FILE_EXTENSION}-Datei laden`" @click="fileInput?.click()">
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="`${FILE_EXTENSION}-Datei oder exportiertes PNG laden`" @click="fileInput?.click()">
           <FontAwesomeIcon :icon="faFileImport" class="mr-2 size-4" />Importieren…
         </button>
-        <input ref="fileInput" type="file" :accept="`${FILE_EXTENSION},.yml,application/yaml,text/yaml`" class="hidden" @change="onImport" />
+        <input ref="fileInput" type="file" :accept="IMPORT_ACCEPT" class="hidden" @change="onImport" />
         <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Diagramm als PNG speichern" @click="onExportPng">
           <FontAwesomeIcon :icon="faImage" class="mr-2 size-4" />PNG
         </button>

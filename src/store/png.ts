@@ -1,16 +1,19 @@
+import { embedPngText } from './pngText'
+
 export const PNG_FILE_NAME = 'finanzen.png'
 
 // styles the SVG gets from Tailwind classes and scoped CSS, which a standalone SVG image would lose
 const INLINED_PROPERTIES = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'paint-order']
 
 /**
- * Rasterizes an SVG element and downloads it as PNG with a white background.
+ * Rasterizes an SVG element and downloads it as PNG with a white background, embedding the YAML source as a text chunk so the file can be imported again.
  *
  * @param svg the element as rendered in the page
+ * @param yaml the document to embed
  * @param scale device pixels per CSS pixel
  * @param fileName download name
  */
-export async function exportPng(svg: SVGSVGElement, scale = 2, fileName = PNG_FILE_NAME) {
+export async function exportPng(svg: SVGSVGElement, yaml: string, scale = 2, fileName = PNG_FILE_NAME) {
   const width = svg.clientWidth || Number(svg.getAttribute('width'))
   const height = svg.clientHeight || Number(svg.getAttribute('height'))
   const image = await loadImage(standaloneSvg(svg))
@@ -25,7 +28,8 @@ export async function exportPng(svg: SVGSVGElement, scale = 2, fileName = PNG_FI
   context.drawImage(image, 0, 0, width, height)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('PNG konnte nicht erzeugt werden.')
-  download(blob, fileName)
+  const withYaml = embedPngText(new Uint8Array(await blob.arrayBuffer()), yaml)
+  download(new Blob([withYaml as BlobPart], { type: 'image/png' }), fileName)
 }
 
 // serializes a copy of the SVG with the computed styles inlined, so it renders the same outside the page
