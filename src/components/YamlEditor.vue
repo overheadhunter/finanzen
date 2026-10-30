@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
+import { INDENT, shiftIndent } from '../indent'
 
 const model = defineModel<string>({ required: true })
 // `cursor` reports the caret offset; -1 means the editor lost focus
@@ -11,11 +12,18 @@ function emitCursor() {
   if (textarea.value) emit('cursor', textarea.value.selectionStart)
 }
 
-// insert two spaces instead of moving focus, so YAML can be indented inside the textarea
+// Tab indents instead of moving focus: a plain caret inserts spaces, a multi-line selection (or Shift+Tab) shifts whole lines
 function onTab(e: KeyboardEvent) {
   const el = e.target as HTMLTextAreaElement
   const { selectionStart, selectionEnd } = el
-  el.setRangeText('  ', selectionStart, selectionEnd, 'end')
+  const multiLine = el.value.slice(selectionStart, selectionEnd).includes('\n')
+  if (e.shiftKey || multiLine) {
+    const edit = shiftIndent(el.value, selectionStart, selectionEnd, e.shiftKey ? -1 : 1)
+    el.setRangeText(edit.replacement, edit.blockStart, edit.blockEnd)
+    el.setSelectionRange(edit.start, edit.end)
+  } else {
+    el.setRangeText(INDENT, selectionStart, selectionEnd, 'end')
+  }
   model.value = el.value
 }
 
