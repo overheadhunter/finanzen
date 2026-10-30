@@ -129,23 +129,18 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
           :width="node.x1! - node.x0!"
           :height="Math.max(1, node.y1! - node.y0!)"
           :style="{ fill: node.color }"
-          :class="node.id === highlighted ? 'stroke-neutral-900 stroke-2' : ''"
+          :class="node.id === highlighted ? 'stroke-neutral-900 stroke-2 dark:stroke-neutral-100' : ''"
           rx="2"
         >
           <title>{{ node.id }}: {{ formatAmount(node.amount, settings) }}</title>
         </rect>
-        <text :x="labelAnchor(node).x" :y="labelAnchor(node).y" :text-anchor="labelAnchor(node).anchor" dominant-baseline="middle" class="label">
+        <text :x="labelAnchor(node).x" :y="labelAnchor(node).y" :text-anchor="labelAnchor(node).anchor" dominant-baseline="middle" class="fill-neutral-950 dark:fill-neutral-100">
           <tspan :class="node.id === highlighted ? 'font-bold' : 'font-medium'">{{ node.name }}</tspan>
-          <tspan dx="0.4em" class="fill-neutral-500">{{ formatAmount(node.amount, settings) }}</tspan>
+          <tspan dx="0.4em" class="fill-neutral-500 dark:fill-neutral-400">{{ formatAmount(node.amount, settings) }}</tspan>
         </text>
       </g>
     </svg>
-    <p v-else class="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-500">{{ t('diagram.empty') }}</p>
+    <p v-else class="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">{{ t('diagram.empty') }}</p>
   </div>
 </template>
 
-<style scoped>
-.label {
-  fill: #0b0b0b;
-}
-</style>

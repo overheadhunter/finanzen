@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/* dark mode is on when <html> has the `dark` class (set from the theme setting, see src/store/theme.ts), but only on screen: printouts always use the light theme */
+@custom-variant dark {
+  @media screen {
+    &:where(.dark, .dark *) {
+      @slot;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    @apply bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;
+  }
+
+  @media screen {
+    html.dark {
+      color-scheme: dark;
+    }
+  }
+}
+
 /* print only the summary and the diagram (everything else carries `print:hidden`) on one A4 landscape page, keeping the colors;
    the diagram lays itself out for the resulting 267mm × 180mm printable area minus the summary row (see PRINT_ASPECT in SankeyDiagram.vue) */
 @page {

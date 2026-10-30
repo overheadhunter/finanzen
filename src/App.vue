@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faFileExport, faFileImport, faImage, faLink, faPrint, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
+import { faCircleHalfStroke, faFileExport, faFileImport, faImage, faLink, faMoon, faPrint, faSun, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
+import { useTheme } from './store/theme'
 import SankeyDiagram from './components/SankeyDiagram.vue'
 import YamlEditor from './components/YamlEditor.vue'
 import { exampleYaml, isExample } from './example'
@@ -20,6 +21,8 @@ const fileInput = ref<HTMLInputElement>()
 const diagram = ref<InstanceType<typeof SankeyDiagram>>()
 const importError = ref('')
 const notice = ref('')
+const { theme, cycle: cycleTheme } = useTheme()
+const themeIcon = computed(() => ({ auto: faCircleHalfStroke, light: faSun, dark: faMoon })[theme.value])
 
 // keep the last valid document while the user is mid-edit, and show the parse error alongside
 const parsed = computed(() => {
@@ -178,67 +181,76 @@ onMounted(async () => {
 <template>
   <div
     v-if="dragging"
-    class="pointer-events-none fixed inset-0 z-10 flex items-center justify-center border-4 border-dashed border-sky-500 bg-sky-50/80 text-lg font-medium text-sky-700 print:hidden"
+    class="pointer-events-none fixed inset-0 z-10 flex items-center justify-center border-4 border-dashed border-sky-500 bg-sky-50/80 text-lg font-medium text-sky-700 dark:bg-sky-950/80 dark:text-sky-300 print:hidden"
   >
     {{ t('app.dropHere') }}
   </div>
   <main class="mx-auto max-w-7xl p-6 print:max-w-none print:p-0">
     <header class="mb-6 flex flex-wrap items-center gap-3 print:hidden">
       <h1 class="text-2xl font-bold">Finanzen</h1>
-      <div class="ml-auto flex gap-2">
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.exampleTitle')" @click="onExample">
-          <FontAwesomeIcon :icon="faWandMagicSparkles" class="mr-2 size-4" />{{ t('app.example') }}
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          :title="t(`app.theme.${theme}`)"
+          :aria-label="t(`app.theme.${theme}`)"
+          @click="cycleTheme"
+        >
+          <FontAwesomeIcon :icon="themeIcon" class="size-4" />{{ t(`app.themeLabel.${theme}`) }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.importTitle', { ext: FILE_EXTENSION })" @click="fileInput?.click()">
-          <FontAwesomeIcon :icon="faFileImport" class="mr-2 size-4" />{{ t('app.import') }}
+        <button type="button" class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" :title="t('app.exampleTitle')" @click="onExample">
+          <FontAwesomeIcon :icon="faWandMagicSparkles" class="size-4" />{{ t('app.example') }}
+        </button>
+        <button type="button" class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" :title="t('app.importTitle', { ext: FILE_EXTENSION })" @click="fileInput?.click()">
+          <FontAwesomeIcon :icon="faFileImport" class="size-4" />{{ t('app.import') }}
         </button>
         <input ref="fileInput" type="file" :accept="IMPORT_ACCEPT" class="hidden" @change="onImport" />
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.pngTitle')" @click="onExportPng">
-          <FontAwesomeIcon :icon="faImage" class="mr-2 size-4" />{{ t('app.png') }}
+        <button type="button" class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" :title="t('app.pngTitle')" @click="onExportPng">
+          <FontAwesomeIcon :icon="faImage" class="size-4" />{{ t('app.png') }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.printTitle')" @click="onPrint">
-          <FontAwesomeIcon :icon="faPrint" class="mr-2 size-4" />{{ t('app.print') }}
+        <button type="button" class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" :title="t('app.printTitle')" @click="onPrint">
+          <FontAwesomeIcon :icon="faPrint" class="size-4" />{{ t('app.print') }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.shareTitle')" @click="onShare">
-          <FontAwesomeIcon :icon="faLink" class="mr-2 size-4" />{{ t('app.share') }}
+        <button type="button" class="inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" :title="t('app.shareTitle')" @click="onShare">
+          <FontAwesomeIcon :icon="faLink" class="size-4" />{{ t('app.share') }}
         </button>
-        <button type="button" class="rounded bg-sky-600 px-3 py-2 text-white hover:bg-sky-700" :title="t('app.exportTitle', { ext: FILE_EXTENSION })" @click="exportYaml(text)">
-          <FontAwesomeIcon :icon="faFileExport" class="mr-2 size-4" />{{ t('app.export') }}
+        <button type="button" class="inline-flex items-center gap-2 rounded bg-sky-600 px-3 py-2 text-white hover:bg-sky-700" :title="t('app.exportTitle', { ext: FILE_EXTENSION })" @click="exportYaml(text)">
+          <FontAwesomeIcon :icon="faFileExport" class="size-4" />{{ t('app.export') }}
         </button>
       </div>
     </header>
 
-    <p v-if="importError" class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">{{ importError }}</p>
-    <p v-if="notice" class="mb-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 print:hidden">{{ notice }}</p>
+    <p v-if="importError" class="mb-4 rounded border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 px-3 py-2 text-sm text-red-700 dark:text-red-400 print:hidden">{{ importError }}</p>
+    <p v-if="notice" class="mb-4 rounded border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950 px-3 py-2 text-sm text-green-700 dark:text-green-400 print:hidden">{{ notice }}</p>
 
     <!-- in print the tiles collapse to a single line of "label value" pairs, so the diagram gets the page -->
     <dl v-if="summary" class="mb-4 grid grid-cols-3 gap-3 text-sm print:mb-2 print:flex print:gap-8">
-      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">{{ t('app.income') }}</dt>
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
+        <dt class="text-neutral-500 dark:text-neutral-400">{{ t('app.income') }}</dt>
         <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.income, settings) }}</dd>
       </div>
-      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">{{ t('app.expenses') }}</dt>
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
+        <dt class="text-neutral-500 dark:text-neutral-400">{{ t('app.expenses') }}</dt>
         <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.expenses, settings) }}</dd>
       </div>
-      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">{{ t('app.balance') }}</dt>
-        <dd class="text-lg font-semibold tabular-nums print:text-sm" :class="summary.balance < 0 ? 'text-red-700' : 'text-green-700'">{{ formatAmount(summary.balance, settings) }}</dd>
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
+        <dt class="text-neutral-500 dark:text-neutral-400">{{ t('app.balance') }}</dt>
+        <dd class="text-lg font-semibold tabular-nums print:text-sm" :class="summary.balance < 0 ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'">{{ formatAmount(summary.balance, settings) }}</dd>
       </div>
     </dl>
 
-    <section class="mb-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-4 shadow-sm print:overflow-visible print:break-inside-avoid print:border-0 print:p-0 print:shadow-none">
+    <section class="mb-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 p-4 shadow-sm print:overflow-visible print:break-inside-avoid print:border-0 print:p-0 print:shadow-none">
       <SankeyDiagram ref="diagram" :graph="graph" :settings="settings" :highlighted="highlighted" @select="onSelect" />
     </section>
 
     <section class="print:hidden">
       <div class="mb-2 flex items-baseline gap-3">
         <h2 class="font-semibold">YAML</h2>
-        <p v-if="parsed.error" class="text-sm text-red-700">{{ parsed.error }}</p>
-        <p v-else class="text-sm text-neutral-500">{{ t('app.yamlHint') }}</p>
+        <p v-if="parsed.error" class="text-sm text-red-700 dark:text-red-400">{{ parsed.error }}</p>
+        <p v-else class="text-sm text-neutral-500 dark:text-neutral-400">{{ t('app.yamlHint') }}</p>
       </div>
       <YamlEditor ref="editor" v-model="text" @cursor="onCursor" />
     </section>
-    <p class="mt-6 text-xs text-neutral-400 print:hidden">{{ t('app.localNote') }}</p>
+    <p class="mt-6 text-xs text-neutral-400 dark:text-neutral-500 print:hidden">{{ t('app.localNote') }}</p>
   </main>
 </template>

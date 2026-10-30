@@ -52,7 +52,7 @@ defineExpose({ select })
     spellcheck="false"
     autocapitalize="off"
     autocomplete="off"
-    class="min-h-[24rem] w-full resize-y rounded-lg border border-neutral-300 bg-white p-3 font-mono text-sm leading-relaxed text-neutral-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+    class="min-h-[24rem] w-full resize-y rounded-lg border border-neutral-300 bg-white p-3 font-mono text-sm leading-relaxed text-neutral-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:ring-sky-900"
     @keydown.tab.prevent="onTab"
     @keyup="emitCursor"
     @click="emitCursor"

@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Finanzen</title>
+    <!-- apply the theme before the first paint to avoid a light flash; see src/store/theme.ts -->
+    <script>
+      const theme = localStorage.getItem('finanzen.theme')
+      if (theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark')
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -1,6 +1,12 @@
 export type Locale = 'en' | 'de'
 
 const en = {
+  'app.theme.auto': 'Theme: automatic (follows the system). Click for light.',
+  'app.theme.light': 'Theme: light. Click for dark.',
+  'app.theme.dark': 'Theme: dark. Click for automatic.',
+  'app.themeLabel.auto': 'Auto',
+  'app.themeLabel.light': 'Light',
+  'app.themeLabel.dark': 'Dark',
   'app.example': 'Example',
   'app.exampleTitle': 'Load the example',
   'app.import': 'Import…',
@@ -59,6 +65,12 @@ const en = {
 export type MessageKey = keyof typeof en
 
 const de: Record<MessageKey, string> = {
+  'app.theme.auto': 'Darstellung: automatisch (wie das System). Klicken für hell.',
+  'app.theme.light': 'Darstellung: hell. Klicken für dunkel.',
+  'app.theme.dark': 'Darstellung: dunkel. Klicken für automatisch.',
+  'app.themeLabel.auto': 'Auto',
+  'app.themeLabel.light': 'Hell',
+  'app.themeLabel.dark': 'Dunkel',
   'app.example': 'Beispiel',
   'app.exampleTitle': 'Beispiel laden',
   'app.import': 'Importieren…',

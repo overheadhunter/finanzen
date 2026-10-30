@@ -35,5 +35,7 @@ Single-page Vue 3 + TypeScript + Tailwind 4 app, no router, no backend. The UI i
 
 ## Conventions
 
+- Dark mode uses Tailwind `dark:` classes on every colored element. The `dark` variant is redefined in `src/style.css` to match a `.dark` class on `<html>`, on screen only, so printouts always use the light theme. `src/store/theme.ts` toggles the class from the theme setting (`auto`/`light`/`dark`, stored in localStorage as `finanzen.theme`, `auto` follows `prefers-color-scheme` live); an inline script in `index.html` applies it before the first paint and must stay in sync. The PNG export takes its background from the diagram's container, so dark exports stay legible.
+
 - Pure logic (`yamlFormat`, `sankeyGraph`, `sankeyLayout`, `model`, `colors`, `format`) stays free of Vue/DOM so it is testable under vitest's `node` environment; tests live next to the source as `*.test.ts`.
 - `tsconfig.app.json` uses `erasableSyntaxOnly`: no enums, no parameter properties.

@@ -7,7 +7,7 @@ export const PNG_FILE_NAME = 'finanzen.png'
 const INLINED_PROPERTIES = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'paint-order']
 
 /**
- * Rasterizes an SVG element and downloads it as PNG with a white background, embedding the YAML source as a text chunk so the file can be imported again.
+ * Rasterizes an SVG element and downloads it as PNG on the background it is shown on (so dark mode exports stay legible), embedding the YAML source as a text chunk so the file can be imported again.
  *
  * @param svg the element as rendered in the page
  * @param yaml the document to embed
@@ -24,13 +24,22 @@ export async function exportPng(svg: SVGSVGElement, yaml: string, scale = 2, fil
   const context = canvas.getContext('2d')
   if (!context) throw new Error(t('png.noCanvas'))
   context.scale(scale, scale)
-  context.fillStyle = '#ffffff'
+  context.fillStyle = backgroundOf(svg)
   context.fillRect(0, 0, width, height)
   context.drawImage(image, 0, 0, width, height)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error(t('png.failed'))
   const withYaml = embedPngText(new Uint8Array(await blob.arrayBuffer()), yaml)
   download(new Blob([withYaml as BlobPart], { type: 'image/png' }), fileName)
+}
+
+// the first non-transparent background among the element's ancestors
+function backgroundOf(element: Element): string {
+  for (let el: Element | null = element; el; el = el.parentElement) {
+    const color = getComputedStyle(el).backgroundColor
+    if (color && color !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(color)) return color
+  }
+  return '#ffffff'
 }
 
 // serializes a copy of the SVG with the computed styles inlined, so it renders the same outside the page
