@@ -1,4 +1,5 @@
 import { categoryColor, DEFICIT_COLOR, NEUTRAL_COLOR, nuance, SURPLUS_COLOR } from './colors'
+import { t } from './i18n'
 import { summarize, type Category, type FinanceDocument } from './model'
 
 export const CENTER_ID = '_center'
@@ -42,7 +43,7 @@ export interface GraphLabels {
   deficit: string
 }
 
-const DEFAULT_LABELS: GraphLabels = { center: 'Budget', surplus: 'Überschuss', deficit: 'Defizit' }
+const defaultLabels = (): GraphLabels => ({ center: t('graph.center'), surplus: t('graph.surplus'), deficit: t('graph.deficit') })
 
 // zero-valued leaves and empty categories don't show up in the diagram
 function isSkipped(node: Category): boolean {
@@ -72,7 +73,7 @@ const LIGHTNESS_STEP = 0.08
  * @param labels names of the synthetic nodes
  * @return nodes and links; empty if the document has no non-zero amounts
  */
-export function buildGraph(doc: FinanceDocument, labels: GraphLabels = DEFAULT_LABELS): Graph {
+export function buildGraph(doc: FinanceDocument, labels: GraphLabels = defaultLabels()): Graph {
   const nodes: GraphNode[] = []
   const links: GraphLink[] = []
   const { income, expenses, balance } = summarize(doc)

@@ -1,4 +1,5 @@
 import { isMap, isNode, isScalar, parseDocument as parseYaml, type Document, type Node, type Pair, type YAMLMap } from 'yaml'
+import { t } from './i18n'
 import { allCategories, type Category, type FinanceDocument, type Settings, type TextRange } from './model'
 
 export const SUPPORTED_VERSION = 1
@@ -17,14 +18,14 @@ export const PATH_SEPARATOR = ' › '
  */
 export function parseDocument(text: string): FinanceDocument {
   const doc = parseYaml(text)
-  if (doc.errors.length > 0) throw new Error(`Ungültiges YAML: ${doc.errors[0]!.message}`)
+  if (doc.errors.length > 0) throw new Error(t('yaml.invalid', { message: doc.errors[0]!.message }))
   const root = doc.contents
   if (root == null) return { settings: defaultSettings(), categories: [] }
-  if (!isMap(root)) throw new Error('Die Datei muss auf oberster Ebene eine Map mit „_settings“ und „_data“ sein.')
+  if (!isMap(root)) throw new Error(t('yaml.rootMap'))
   const settings = parseSettings(toJs(doc, findPair(root, '_settings')?.value))
   const data = findPair(root, '_data')?.value
   if (data == null || (isScalar(data) && data.value == null)) return { settings, categories: [] }
-  if (!isMap(data)) throw new Error('„_data“ muss eine Map aus Kategorien sein.')
+  if (!isMap(data)) throw new Error(t('yaml.dataMap'))
   const categories = categoryPairs(data).map((pair) => parseCategory(doc, pair, keyOf(pair)))
   return { settings, categories }
 }
@@ -36,20 +37,20 @@ function defaultSettings(): Settings {
 function parseSettings(raw: unknown): Settings {
   const settings = defaultSettings()
   if (raw == null) return settings
-  if (!isRecord(raw)) throw new Error('„_settings“ muss eine Map sein.')
+  if (!isRecord(raw)) throw new Error(t('yaml.settingsMap'))
   if (raw.version != null) {
-    if (raw.version !== SUPPORTED_VERSION) throw new Error(`Nicht unterstützte Version ${String(raw.version)} (erwartet: ${SUPPORTED_VERSION}).`)
+    if (raw.version !== SUPPORTED_VERSION) throw new Error(t('yaml.version', { version: String(raw.version), expected: SUPPORTED_VERSION }))
     settings.version = raw.version
   }
   if (raw.currency != null) {
-    if (!isRecord(raw.currency)) throw new Error('„_settings.currency“ muss eine Map sein.')
+    if (!isRecord(raw.currency)) throw new Error(t('yaml.currencyMap'))
     if (raw.currency.symbol != null) {
-      if (typeof raw.currency.symbol !== 'string') throw new Error('„_settings.currency.symbol“ muss ein Text sein.')
+      if (typeof raw.currency.symbol !== 'string') throw new Error(t('yaml.symbol'))
       settings.currencySymbol = raw.currency.symbol
     }
     const decimals = raw.currency.decimals
     if (decimals != null) {
-      if (typeof decimals !== 'number' || !Number.isInteger(decimals) || decimals < 0 || decimals > 20) throw new Error('„_settings.currency.decimals“ muss eine ganze Zahl zwischen 0 und 20 sein.')
+      if (typeof decimals !== 'number' || !Number.isInteger(decimals) || decimals < 0 || decimals > 20) throw new Error(t('yaml.decimals'))
       settings.decimals = decimals
     }
   }
@@ -63,10 +64,10 @@ function parseCategory(doc: Document, pair: Pair<unknown, unknown>, path: string
   if (value == null || (isScalar(value) && value.value == null)) return { ...base, total: 0, children: [] }
   if (isScalar(value)) {
     const amount = toAmount(value.value)
-    if (amount === undefined) throw new Error(`„${path}“ muss ein endlicher Betrag sein.`)
+    if (amount === undefined) throw new Error(t('yaml.amount', { path }))
     return { ...base, amount, total: amount, children: [], valueRange: scalarRange(value) }
   }
-  if (!isMap(value)) throw new Error(`„${path}“ muss ein Betrag oder eine Map aus Unterkategorien sein.`)
+  if (!isMap(value)) throw new Error(t('yaml.amountOrMap', { path }))
   const settingsPair = findPair(value, '_settings')
   const { name, amount } = parseCategorySettings(toJs(doc, settingsPair?.value), path)
   const children = categoryPairs(value).map((child) => parseCategory(doc, child, path + PATH_SEPARATOR + keyOf(child)))
@@ -127,15 +128,15 @@ export function formatYamlAmount(amount: number, decimals: number): string {
 // `_settings.value` carries the amount of a category without subcategories; with subcategories it is ignored
 function parseCategorySettings(raw: unknown, path: string): { name?: string; amount?: number } {
   if (raw == null) return {}
-  if (!isRecord(raw)) throw new Error(`„${path}“: „_settings“ muss eine Map sein.`)
+  if (!isRecord(raw)) throw new Error(t('yaml.categorySettingsMap', { path }))
   const result: { name?: string; amount?: number } = {}
   if (raw.displayname != null) {
-    if (typeof raw.displayname !== 'string') throw new Error(`„${path}“: „_settings.displayname“ muss ein Text sein.`)
+    if (typeof raw.displayname !== 'string') throw new Error(t('yaml.displayname', { path }))
     result.name = raw.displayname
   }
   if (raw.value != null) {
     const amount = toAmount(raw.value)
-    if (amount === undefined) throw new Error(`„${path}“: „_settings.value“ muss ein endlicher Betrag sein.`)
+    if (amount === undefined) throw new Error(t('yaml.value', { path }))
     result.amount = amount
   }
   return result

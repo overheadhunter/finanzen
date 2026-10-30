@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { formatAmount } from '../format'
+import { t } from '../i18n'
 import type { Settings } from '../model'
 import type { Graph } from '../sankeyGraph'
 import { layoutGraph, leafRows, linkPath, type LayoutLink, type LayoutNode } from '../sankeyLayout'
@@ -139,7 +140,7 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
         </text>
       </g>
     </svg>
-    <p v-else class="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-500">Keine Beträge vorhanden. Trage unter „_data“ Einnahmen (positiv) und Ausgaben (negativ) ein.</p>
+    <p v-else class="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-500">{{ t('diagram.empty') }}</p>
   </div>
 </template>
 

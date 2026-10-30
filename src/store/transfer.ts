@@ -1,4 +1,5 @@
 import { FILE_EXTENSION } from '../yamlFormat'
+import { t } from '../i18n'
 import { extractPngText } from './pngText'
 
 export const EXPORT_FILE_NAME = 'finanzen' + FILE_EXTENSION
@@ -15,7 +16,7 @@ export const IMPORT_ACCEPT = `${FILE_EXTENSION},.yml,application/yaml,text/yaml,
 export async function importYaml(file: File): Promise<string> {
   if (file.type !== 'image/png' && !file.name.toLowerCase().endsWith('.png')) return file.text()
   const yaml = extractPngText(new Uint8Array(await file.arrayBuffer()))
-  if (yaml === null) throw new Error('Das PNG enthält keine Finanzen-Daten.')
+  if (yaml === null) throw new Error(t('png.noData'))
   return yaml
 }
 

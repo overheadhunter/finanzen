@@ -4,8 +4,9 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faFileExport, faFileImport, faImage, faLink, faPrint, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
 import SankeyDiagram from './components/SankeyDiagram.vue'
 import YamlEditor from './components/YamlEditor.vue'
-import { EXAMPLE_YAML } from './example'
+import { exampleYaml, isExample } from './example'
 import { formatAmount } from './format'
+import { t } from './i18n'
 import { categoryAt, findCategory, summarize } from './model'
 import { buildGraph } from './sankeyGraph'
 import { useDocumentText } from './store/document'
@@ -73,9 +74,9 @@ async function importFile(file: File) {
     const content = await importYaml(file)
     parseDocument(content) // validate before replacing the editor content
     text.value = normalizeAmounts(content).text
-    showNotice(`„${file.name}“ importiert.`)
+    showNotice(t('app.imported', { name: file.name }))
   } catch (err) {
-    importError.value = err instanceof Error ? err.message : 'Import fehlgeschlagen.'
+    importError.value = err instanceof Error ? err.message : t('app.importFailed')
   }
 }
 
@@ -104,7 +105,7 @@ async function onDrop(e: DragEvent) {
   const file = e.dataTransfer?.files[0]
   if (!file) return
   if (!/\.(ya?ml|png)$/i.test(file.name)) {
-    importError.value = `„${file.name}“ ist weder eine YAML- noch eine PNG-Datei.`
+    importError.value = t('app.notYamlOrPng', { name: file.name })
     return
   }
   await importFile(file)
@@ -119,20 +120,20 @@ onMounted(() => dragListeners.forEach(([type, listener]) => document.addEventLis
 onBeforeUnmount(() => dragListeners.forEach(([type, listener]) => document.removeEventListener(type, listener as EventListener)))
 
 function onExample() {
-  if (text.value.trim() === '' || text.value === EXAMPLE_YAML || confirm('Aktuellen Inhalt durch das Beispiel ersetzen?')) text.value = EXAMPLE_YAML
+  if (text.value.trim() === '' || isExample(text.value) || confirm(t('app.replaceWithExample'))) text.value = exampleYaml()
 }
 
 async function onExportPng() {
   importError.value = ''
   const svg = diagram.value?.svgElement()
   if (!svg) {
-    importError.value = 'Kein Diagramm vorhanden.'
+    importError.value = t('app.noDiagram')
     return
   }
   try {
     await exportPng(svg, text.value)
   } catch (err) {
-    importError.value = err instanceof Error ? err.message : 'PNG-Export fehlgeschlagen.'
+    importError.value = err instanceof Error ? err.message : t('app.pngFailed')
   }
 }
 
@@ -142,9 +143,9 @@ async function onShare() {
   const url = shareUrl(await encodeShare(text.value))
   try {
     await navigator.clipboard.writeText(url)
-    showNotice('Link in die Zwischenablage kopiert.')
+    showNotice(t('app.linkCopied'))
   } catch {
-    prompt('Link zum Teilen:', url)
+    prompt(t('app.linkPrompt'), url)
   }
 }
 
@@ -166,10 +167,10 @@ onMounted(async () => {
   try {
     const shared = await decodeShare(encoded)
     parseDocument(shared)
-    const untouched = text.value.trim() === '' || text.value === EXAMPLE_YAML || text.value === shared
-    if (untouched || confirm('Geteilte Daten laden und den aktuellen Inhalt ersetzen?')) text.value = shared
+    const untouched = text.value.trim() === '' || isExample(text.value) || text.value === shared
+    if (untouched || confirm(t('app.loadShared'))) text.value = shared
   } catch (err) {
-    importError.value = err instanceof Error ? err.message : 'Der geteilte Link konnte nicht geladen werden.'
+    importError.value = err instanceof Error ? err.message : t('app.sharedFailed')
   }
 })
 </script>
@@ -179,30 +180,30 @@ onMounted(async () => {
     v-if="dragging"
     class="pointer-events-none fixed inset-0 z-10 flex items-center justify-center border-4 border-dashed border-sky-500 bg-sky-50/80 text-lg font-medium text-sky-700 print:hidden"
   >
-    YAML- oder PNG-Datei hier ablegen
+    {{ t('app.dropHere') }}
   </div>
   <main class="mx-auto max-w-7xl p-6 print:max-w-none print:p-0">
     <header class="mb-6 flex flex-wrap items-center gap-3 print:hidden">
       <h1 class="text-2xl font-bold">Finanzen</h1>
       <div class="ml-auto flex gap-2">
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Beispiel laden" @click="onExample">
-          <FontAwesomeIcon :icon="faWandMagicSparkles" class="mr-2 size-4" />Beispiel
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.exampleTitle')" @click="onExample">
+          <FontAwesomeIcon :icon="faWandMagicSparkles" class="mr-2 size-4" />{{ t('app.example') }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="`${FILE_EXTENSION}-Datei oder exportiertes PNG laden`" @click="fileInput?.click()">
-          <FontAwesomeIcon :icon="faFileImport" class="mr-2 size-4" />Importieren…
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.importTitle', { ext: FILE_EXTENSION })" @click="fileInput?.click()">
+          <FontAwesomeIcon :icon="faFileImport" class="mr-2 size-4" />{{ t('app.import') }}
         </button>
         <input ref="fileInput" type="file" :accept="IMPORT_ACCEPT" class="hidden" @change="onImport" />
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Diagramm als PNG speichern" @click="onExportPng">
-          <FontAwesomeIcon :icon="faImage" class="mr-2 size-4" />PNG
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.pngTitle')" @click="onExportPng">
+          <FontAwesomeIcon :icon="faImage" class="mr-2 size-4" />{{ t('app.png') }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Diagramm drucken (A4 quer)" @click="onPrint">
-          <FontAwesomeIcon :icon="faPrint" class="mr-2 size-4" />Drucken
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.printTitle')" @click="onPrint">
+          <FontAwesomeIcon :icon="faPrint" class="mr-2 size-4" />{{ t('app.print') }}
         </button>
-        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Link mit den aktuellen Daten kopieren" @click="onShare">
-          <FontAwesomeIcon :icon="faLink" class="mr-2 size-4" />Teilen
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" :title="t('app.shareTitle')" @click="onShare">
+          <FontAwesomeIcon :icon="faLink" class="mr-2 size-4" />{{ t('app.share') }}
         </button>
-        <button type="button" class="rounded bg-sky-600 px-3 py-2 text-white hover:bg-sky-700" :title="`Als ${FILE_EXTENSION}-Datei speichern`" @click="exportYaml(text)">
-          <FontAwesomeIcon :icon="faFileExport" class="mr-2 size-4" />Exportieren
+        <button type="button" class="rounded bg-sky-600 px-3 py-2 text-white hover:bg-sky-700" :title="t('app.exportTitle', { ext: FILE_EXTENSION })" @click="exportYaml(text)">
+          <FontAwesomeIcon :icon="faFileExport" class="mr-2 size-4" />{{ t('app.export') }}
         </button>
       </div>
     </header>
@@ -213,15 +214,15 @@ onMounted(async () => {
     <!-- in print the tiles collapse to a single line of "label value" pairs, so the diagram gets the page -->
     <dl v-if="summary" class="mb-4 grid grid-cols-3 gap-3 text-sm print:mb-2 print:flex print:gap-8">
       <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">Einnahmen</dt>
+        <dt class="text-neutral-500">{{ t('app.income') }}</dt>
         <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.income, settings) }}</dd>
       </div>
       <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">Ausgaben</dt>
+        <dt class="text-neutral-500">{{ t('app.expenses') }}</dt>
         <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.expenses, settings) }}</dd>
       </div>
       <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
-        <dt class="text-neutral-500">Saldo</dt>
+        <dt class="text-neutral-500">{{ t('app.balance') }}</dt>
         <dd class="text-lg font-semibold tabular-nums print:text-sm" :class="summary.balance < 0 ? 'text-red-700' : 'text-green-700'">{{ formatAmount(summary.balance, settings) }}</dd>
       </div>
     </dl>
@@ -234,10 +235,10 @@ onMounted(async () => {
       <div class="mb-2 flex items-baseline gap-3">
         <h2 class="font-semibold">YAML</h2>
         <p v-if="parsed.error" class="text-sm text-red-700">{{ parsed.error }}</p>
-        <p v-else class="text-sm text-neutral-500">Änderungen werden sofort übernommen und lokal gespeichert.</p>
+        <p v-else class="text-sm text-neutral-500">{{ t('app.yamlHint') }}</p>
       </div>
       <YamlEditor ref="editor" v-model="text" @cursor="onCursor" />
     </section>
-    <p class="mt-6 text-xs text-neutral-400 print:hidden">Alle Daten werden ausschließlich lokal in diesem Browser gespeichert. Zum Übertragen auf ein anderes Gerät die YAML-Datei exportieren und dort importieren.</p>
+    <p class="mt-6 text-xs text-neutral-400 print:hidden">{{ t('app.localNote') }}</p>
   </main>
 </template>

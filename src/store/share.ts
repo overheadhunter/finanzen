@@ -1,3 +1,5 @@
+import { t } from '../i18n'
+
 /** Name of the URL fragment parameter that carries a shared document, as in `#yaml=…`. Fragments never reach the server. */
 export const SHARE_PARAM = 'yaml'
 
@@ -24,13 +26,13 @@ export async function decodeShare(encoded: string): Promise<string> {
   try {
     bytes = fromBase64Url(encoded)
   } catch {
-    throw new Error('Der Link enthält keine gültigen Daten.')
+    throw new Error(t('share.invalid'))
   }
   try {
     const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
     return await new Response(stream).text()
   } catch {
-    throw new Error('Die Daten im Link konnten nicht entpackt werden.')
+    throw new Error(t('share.corrupt'))
   }
 }
 

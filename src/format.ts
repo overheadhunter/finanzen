@@ -1,13 +1,16 @@
+import { locale, NUMBER_LOCALES } from './i18n'
 import type { Settings } from './model'
 
-const formats = new Map<number, Intl.NumberFormat>()
+const formats = new Map<string, Intl.NumberFormat>()
 
-/** Formats an amount with the configured fraction digits and currency symbol, e.g. `-1.234,50 €`. */
+/** Formats an amount in the active language with the configured fraction digits and currency symbol, e.g. `-1,234.50 €` or `-1.234,50 €`. */
 export function formatAmount(amount: number, settings: Pick<Settings, 'currencySymbol' | 'decimals'>): string {
-  let format = formats.get(settings.decimals)
+  const tag = NUMBER_LOCALES[locale()]
+  const key = `${tag}/${settings.decimals}`
+  let format = formats.get(key)
   if (!format) {
-    format = new Intl.NumberFormat('de-DE', { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals })
-    formats.set(settings.decimals, format)
+    format = new Intl.NumberFormat(tag, { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals })
+    formats.set(key, format)
   }
   return `${format.format(amount)} ${settings.currencySymbol}`.trim()
 }

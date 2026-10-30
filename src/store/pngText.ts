@@ -1,3 +1,5 @@
+import { t } from '../i18n'
+
 /** Keyword of the PNG text chunk that carries the YAML document; reverse domain name to avoid collisions with other tools' chunks. */
 export const PNG_TEXT_KEYWORD = 'de.sebastianstenzel.finanzen'
 
@@ -37,7 +39,7 @@ export function extractPngText(png: Uint8Array, keyword = PNG_TEXT_KEYWORD): str
     offset += 2
     offset = chunk.data.indexOf(0, offset) + 1
     offset = chunk.data.indexOf(0, offset) + 1
-    if (compressed) throw new Error('Komprimierte PNG-Textdaten werden nicht unterstützt.')
+    if (compressed) throw new Error(t('png.compressed'))
     return new TextDecoder().decode(chunk.data.subarray(offset))
   }
   return null
@@ -49,7 +51,7 @@ interface Chunk {
 }
 
 function readChunks(png: Uint8Array): Chunk[] {
-  if (png.length < 8 || SIGNATURE.some((b, i) => png[i] !== b)) throw new Error('Die Datei ist kein PNG.')
+  if (png.length < 8 || SIGNATURE.some((b, i) => png[i] !== b)) throw new Error(t('png.notPng'))
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength)
   const chunks: Chunk[] = []
   let offset = 8
@@ -59,7 +61,7 @@ function readChunks(png: Uint8Array): Chunk[] {
     chunks.push({ type, data: png.subarray(offset + 8, offset + 8 + length) })
     offset += 12 + length
   }
-  if (chunks[0]?.type !== 'IHDR') throw new Error('Die Datei ist kein PNG.')
+  if (chunks[0]?.type !== 'IHDR') throw new Error(t('png.notPng'))
   return chunks
 }
 

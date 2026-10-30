@@ -26,6 +26,6 @@ describe('png text chunks', () => {
   })
 
   it('rejects other files', () => {
-    expect(() => extractPngText(new TextEncoder().encode('_data: {}'))).toThrow('kein PNG')
+    expect(() => extractPngText(new TextEncoder().encode('_data: {}'))).toThrow('not a PNG')
   })
 })

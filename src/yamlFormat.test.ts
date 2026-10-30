@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { EXAMPLE_YAML } from './example'
+import { EXAMPLES } from './example'
 import { categoryAt, summarize } from './model'
 import { coerceAmount, formatYamlAmount, normalizeAmounts, parseDocument } from './yamlFormat'
 
 describe('parseDocument', () => {
   it('parses the example into a tree with totals', () => {
-    const doc = parseDocument(EXAMPLE_YAML)
+    const doc = parseDocument(EXAMPLES.de)
     expect(doc.settings).toEqual({ version: 1, currencySymbol: '€', decimals: 2 })
     expect(doc.categories.map((c) => [c.key, c.name, c.total])).toEqual([
       ['Gehalt', 'Gehalt', 1900],
@@ -65,7 +65,7 @@ describe('parseDocument', () => {
     expect(coerceAmount('')).toBeUndefined()
     const doc = parseDocument('_data:\n  a: -1.234,56\n  b:\n    _settings: { value: "2,5" }\n')
     expect(doc.categories.map((c) => c.amount)).toEqual([-1234.56, 2.5])
-    expect(() => parseDocument('_data:\n  a: text\n')).toThrow('„a“')
+    expect(() => parseDocument('_data:\n  a: text\n')).toThrow('“a”')
   })
 
   it('rewrites every amount literal into its canonical form', () => {
@@ -103,12 +103,12 @@ describe('parseDocument', () => {
   })
 
   it('rejects broken documents with a path', () => {
-    expect(() => parseDocument('a: [')).toThrow('Ungültiges YAML')
-    expect(() => parseDocument('- 1')).toThrow('oberster Ebene')
-    expect(() => parseDocument('_settings:\n  version: 2\n')).toThrow('Version 2')
+    expect(() => parseDocument('a: [')).toThrow('Invalid YAML')
+    expect(() => parseDocument('- 1')).toThrow('top level')
+    expect(() => parseDocument('_settings:\n  version: 2\n')).toThrow('version 2')
     expect(() => parseDocument('_settings:\n  currency:\n    symbol: 1\n')).toThrow('symbol')
     expect(() => parseDocument('_settings:\n  currency:\n    decimals: 1.5\n')).toThrow('currency.decimals')
-    expect(() => parseDocument('_data:\n  a:\n    b: text\n')).toThrow('„a › b“')
+    expect(() => parseDocument('_data:\n  a:\n    b: text\n')).toThrow('“a › b”')
     expect(() => parseDocument('_data:\n  a:\n    _settings: { displayname: 1 }\n')).toThrow('displayname')
     expect(() => parseDocument('_data:\n  a:\n    _settings: { value: "x" }\n')).toThrow('_settings.value')
   })

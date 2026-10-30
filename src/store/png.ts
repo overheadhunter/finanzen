@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import { embedPngText } from './pngText'
 
 export const PNG_FILE_NAME = 'finanzen.png'
@@ -21,13 +22,13 @@ export async function exportPng(svg: SVGSVGElement, yaml: string, scale = 2, fil
   canvas.width = Math.round(width * scale)
   canvas.height = Math.round(height * scale)
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('Canvas wird nicht unterstützt.')
+  if (!context) throw new Error(t('png.noCanvas'))
   context.scale(scale, scale)
   context.fillStyle = '#ffffff'
   context.fillRect(0, 0, width, height)
   context.drawImage(image, 0, 0, width, height)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-  if (!blob) throw new Error('PNG konnte nicht erzeugt werden.')
+  if (!blob) throw new Error(t('png.failed'))
   const withYaml = embedPngText(new Uint8Array(await blob.arrayBuffer()), yaml)
   download(new Blob([withYaml as BlobPart], { type: 'image/png' }), fileName)
 }
@@ -59,7 +60,7 @@ function loadImage(svgText: string): Promise<HTMLImageElement> {
     }
     image.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('Das Diagramm konnte nicht gerendert werden.'))
+      reject(new Error(t('png.render')))
     }
     image.src = url
   })
