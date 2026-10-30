@@ -29,7 +29,7 @@ Single-page Vue 3 + TypeScript + Tailwind 4 app, no router, no backend. The UI l
 
 **Editor ↔ diagram linking.** The parser walks the `yaml` AST (not `toJS`) so every `Category` carries source offsets: `range` (key through last child), `keyRange`, and `valueRange` (the amount literal, also for `_settings.value`). `categoryAt(doc, offset)` maps the editor cursor to the deepest category, which `App.vue` passes to the diagram as `highlighted`; clicking a node or its flow emits `select` with the category path, and `App.vue` selects its `valueRange` (or `keyRange`) in the textarea via the editor's exposed `select()`. Each `GraphLink` carries `node`, the child endpoint it belongs to, so flows hover and click like their category.
 
-**Colors** (`src/colors.ts`): top-level categories take the fixed eight-color categorical palette in YAML order; subcategories are derived with CSS relative color syntax (`oklch(from …)`), getting lighter per depth and fanning out in hue among siblings. Colors are therefore CSS strings, not hex, and are applied via `style` bindings.
+**Colors** (`src/colors.ts`): top-level categories take `CATEGORY_COLORS` in YAML order, a fixed list of Tailwind 4 hues stored as `oklch()` literals (Tailwind only emits `--color-*` variables for utilities it sees, so `var(--color-…)` would be empty); green and red are reserved for surplus/deficit; subcategories are derived with CSS relative color syntax (`oklch(from …)`), getting lighter per depth and fanning out in hue among siblings. Colors are therefore CSS strings, not hex, and are applied via `style` bindings.
 
 ## Conventions
 
