@@ -7,7 +7,8 @@ Browser-App zur Visualisierung von Einnahmen und Ausgaben als Sankey-Diagramm. L
 - Jede Hauptkategorie bekommt eine eigene Farbe, Unterkategorien passende Nuancen.
 - Schlüssel mit führendem `_` sind für Metadaten reserviert (`_settings`, `_data`). Eine Kategorie ohne Unterkategorien bekommt ihren Betrag über `_settings.value`; mit Unterkategorien wird `value` ignoriert.
 - Beträge werden vereinheitlicht, sobald der Cursor die Zeile verlässt: Schreibweisen wie `1.234,56` oder `-1 000` werden korrigiert, Dezimalzahlen auf mindestens `_settings.currency.decimals` Nachkommastellen aufgefüllt (Standard: 2), ganze Zahlen bleiben ohne Nachkommastellen. Die Anzeige rundet auf dieselbe Stellenzahl.
-- Import/Export als `.yaml`-Datei zum Übertragen auf andere Geräte.
+- Import/Export als `.yaml`-Datei zum Übertragen auf andere Geräte, Export des Diagramms als PNG.
+- „Teilen“ kopiert einen Link, der die Daten komprimiert im URL-Fragment (`#yaml=…`) trägt. Fragmente werden nie an den Server übertragen; wer den Link öffnet, bekommt die Daten in seinen Browser geladen.
 
 ```yaml
 _settings:

@@ -23,20 +23,41 @@ const ROW_HEIGHT = 44
 const MIN_HEIGHT = 320
 
 const container = ref<HTMLDivElement>()
-const width = ref(960)
+const svg = ref<SVGSVGElement>()
+
+/** The rendered SVG element, e.g. for exporting; `undefined` while there is nothing to draw. */
+function svgElement(): SVGSVGElement | undefined {
+  return svg.value
+}
+defineExpose({ svgElement })
+const screenWidth = ref(960)
 const hovered = ref<string | null>(null)
+
+// while printing, the diagram is laid out for the printable area of an A4 landscape page (267mm × 180mm, see `@page` in style.css) minus the one-line summary above it
+const printing = ref(false)
+const PRINT_WIDTH = 1000
+const PRINT_ASPECT = 170 / 267
+const onBeforePrint = () => (printing.value = true)
+const onAfterPrint = () => (printing.value = false)
 
 let observer: ResizeObserver | undefined
 onMounted(() => {
   observer = new ResizeObserver(([entry]) => {
-    if (entry) width.value = Math.max(480, entry.contentRect.width)
+    if (entry) screenWidth.value = Math.max(480, entry.contentRect.width)
   })
   if (container.value) observer.observe(container.value)
+  window.addEventListener('beforeprint', onBeforePrint)
+  window.addEventListener('afterprint', onAfterPrint)
 })
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  window.removeEventListener('beforeprint', onBeforePrint)
+  window.removeEventListener('afterprint', onAfterPrint)
+})
 
-// every leaf gets a row on its side of the diagram, so the band layout has room for bars and padding
-const height = computed(() => Math.max(MIN_HEIGHT, leafRows(props.graph) * ROW_HEIGHT + 2 * MARGIN_Y))
+const width = computed(() => (printing.value ? PRINT_WIDTH : screenWidth.value))
+// on screen every leaf gets a row on its side of the diagram, so the band layout has room for bars and padding; in print the page dictates the height
+const height = computed(() => (printing.value ? PRINT_WIDTH * PRINT_ASPECT : Math.max(MIN_HEIGHT, leafRows(props.graph) * ROW_HEIGHT + 2 * MARGIN_Y)))
 
 const layout = computed(() =>
   layoutGraph(props.graph, { width: width.value, height: height.value, marginX: MARGIN_X, marginY: MARGIN_Y, nodeWidth: NODE_WIDTH, nodePadding: NODE_PADDING }),
@@ -78,7 +99,7 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
 
 <template>
   <div ref="container" class="w-full">
-    <svg v-if="layout" :viewBox="`0 0 ${width} ${height}`" :width="width" :height="height" class="block select-none text-xs">
+    <svg v-if="layout" ref="svg" :viewBox="`0 0 ${width} ${height}`" :width="width" :height="height" class="block select-none text-xs print:h-auto print:w-full">
       <g>
         <path
           v-for="(link, i) in layout.links"

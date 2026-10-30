@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faFileExport, faFileImport, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
+import { faFileExport, faFileImport, faImage, faLink, faPrint, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons'
 import SankeyDiagram from './components/SankeyDiagram.vue'
 import YamlEditor from './components/YamlEditor.vue'
 import { EXAMPLE_YAML } from './example'
@@ -9,12 +9,16 @@ import { formatAmount } from './format'
 import { categoryAt, findCategory, summarize } from './model'
 import { buildGraph } from './sankeyGraph'
 import { useDocumentText } from './store/document'
+import { exportPng } from './store/png'
+import { decodeShare, encodeShare, sharedFragment, shareUrl } from './store/share'
 import { exportYaml, importYaml } from './store/transfer'
 import { DEFAULT_CURRENCY_SYMBOL, DEFAULT_DECIMALS, FILE_EXTENSION, normalizeAmounts, parseDocument } from './yamlFormat'
 
 const text = useDocumentText()
 const fileInput = ref<HTMLInputElement>()
+const diagram = ref<InstanceType<typeof SankeyDiagram>>()
 const importError = ref('')
+const notice = ref('')
 
 // keep the last valid document while the user is mid-edit, and show the parse error alongside
 const parsed = computed(() => {
@@ -74,11 +78,62 @@ async function onImport(e: Event) {
 function onExample() {
   if (text.value.trim() === '' || text.value === EXAMPLE_YAML || confirm('Aktuellen Inhalt durch das Beispiel ersetzen?')) text.value = EXAMPLE_YAML
 }
+
+async function onExportPng() {
+  importError.value = ''
+  const svg = diagram.value?.svgElement()
+  if (!svg) {
+    importError.value = 'Kein Diagramm vorhanden.'
+    return
+  }
+  try {
+    await exportPng(svg)
+  } catch (err) {
+    importError.value = err instanceof Error ? err.message : 'PNG-Export fehlgeschlagen.'
+  }
+}
+
+// the document travels compressed in the URL fragment, which browsers never send to the server
+async function onShare() {
+  importError.value = ''
+  const url = shareUrl(await encodeShare(text.value))
+  try {
+    await navigator.clipboard.writeText(url)
+    showNotice('Link in die Zwischenablage kopiert.')
+  } catch {
+    prompt('Link zum Teilen:', url)
+  }
+}
+
+function onPrint() {
+  window.print()
+}
+
+function showNotice(message: string) {
+  notice.value = message
+  setTimeout(() => {
+    if (notice.value === message) notice.value = ''
+  }, 3000)
+}
+
+onMounted(async () => {
+  const encoded = sharedFragment(location.hash)
+  if (!encoded) return
+  history.replaceState(null, '', location.pathname + location.search) // a reload must not re-import
+  try {
+    const shared = await decodeShare(encoded)
+    parseDocument(shared)
+    const untouched = text.value.trim() === '' || text.value === EXAMPLE_YAML || text.value === shared
+    if (untouched || confirm('Geteilte Daten laden und den aktuellen Inhalt ersetzen?')) text.value = shared
+  } catch (err) {
+    importError.value = err instanceof Error ? err.message : 'Der geteilte Link konnte nicht geladen werden.'
+  }
+})
 </script>
 
 <template>
-  <main class="mx-auto max-w-7xl p-6">
-    <header class="mb-6 flex flex-wrap items-center gap-3">
+  <main class="mx-auto max-w-7xl p-6 print:max-w-none print:p-0">
+    <header class="mb-6 flex flex-wrap items-center gap-3 print:hidden">
       <h1 class="text-2xl font-bold">Finanzen</h1>
       <div class="ml-auto flex gap-2">
         <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Beispiel laden" @click="onExample">
@@ -88,34 +143,45 @@ function onExample() {
           <FontAwesomeIcon :icon="faFileImport" class="mr-2 size-4" />Importieren…
         </button>
         <input ref="fileInput" type="file" :accept="`${FILE_EXTENSION},.yml,application/yaml,text/yaml`" class="hidden" @change="onImport" />
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Diagramm als PNG speichern" @click="onExportPng">
+          <FontAwesomeIcon :icon="faImage" class="mr-2 size-4" />PNG
+        </button>
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Diagramm drucken (A4 quer)" @click="onPrint">
+          <FontAwesomeIcon :icon="faPrint" class="mr-2 size-4" />Drucken
+        </button>
+        <button type="button" class="rounded border border-neutral-300 px-3 py-2 hover:bg-neutral-100" title="Link mit den aktuellen Daten kopieren" @click="onShare">
+          <FontAwesomeIcon :icon="faLink" class="mr-2 size-4" />Teilen
+        </button>
         <button type="button" class="rounded bg-sky-600 px-3 py-2 text-white hover:bg-sky-700" :title="`Als ${FILE_EXTENSION}-Datei speichern`" @click="exportYaml(text)">
           <FontAwesomeIcon :icon="faFileExport" class="mr-2 size-4" />Exportieren
         </button>
       </div>
     </header>
 
-    <p v-if="importError" class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ importError }}</p>
+    <p v-if="importError" class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">{{ importError }}</p>
+    <p v-if="notice" class="mb-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 print:hidden">{{ notice }}</p>
 
-    <dl v-if="summary" class="mb-4 grid grid-cols-3 gap-3 text-sm">
-      <div class="rounded-lg border border-neutral-200 bg-white p-3">
+    <!-- in print the tiles collapse to a single line of "label value" pairs, so the diagram gets the page -->
+    <dl v-if="summary" class="mb-4 grid grid-cols-3 gap-3 text-sm print:mb-2 print:flex print:gap-8">
+      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
         <dt class="text-neutral-500">Einnahmen</dt>
-        <dd class="text-lg font-semibold tabular-nums">{{ formatAmount(summary.income, settings) }}</dd>
+        <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.income, settings) }}</dd>
       </div>
-      <div class="rounded-lg border border-neutral-200 bg-white p-3">
+      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
         <dt class="text-neutral-500">Ausgaben</dt>
-        <dd class="text-lg font-semibold tabular-nums">{{ formatAmount(summary.expenses, settings) }}</dd>
+        <dd class="text-lg font-semibold tabular-nums print:text-sm">{{ formatAmount(summary.expenses, settings) }}</dd>
       </div>
-      <div class="rounded-lg border border-neutral-200 bg-white p-3">
+      <div class="rounded-lg border border-neutral-200 bg-white p-3 print:flex print:items-baseline print:gap-2 print:border-0 print:p-0">
         <dt class="text-neutral-500">Saldo</dt>
-        <dd class="text-lg font-semibold tabular-nums" :class="summary.balance < 0 ? 'text-red-700' : 'text-green-700'">{{ formatAmount(summary.balance, settings) }}</dd>
+        <dd class="text-lg font-semibold tabular-nums print:text-sm" :class="summary.balance < 0 ? 'text-red-700' : 'text-green-700'">{{ formatAmount(summary.balance, settings) }}</dd>
       </div>
     </dl>
 
-    <section class="mb-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <SankeyDiagram :graph="graph" :settings="settings" :highlighted="highlighted" @select="onSelect" />
+    <section class="mb-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-4 shadow-sm print:overflow-visible print:break-inside-avoid print:border-0 print:p-0 print:shadow-none">
+      <SankeyDiagram ref="diagram" :graph="graph" :settings="settings" :highlighted="highlighted" @select="onSelect" />
     </section>
 
-    <section>
+    <section class="print:hidden">
       <div class="mb-2 flex items-baseline gap-3">
         <h2 class="font-semibold">YAML</h2>
         <p v-if="parsed.error" class="text-sm text-red-700">{{ parsed.error }}</p>
@@ -123,6 +189,6 @@ function onExample() {
       </div>
       <YamlEditor ref="editor" v-model="text" @cursor="onCursor" />
     </section>
-    <p class="mt-6 text-xs text-neutral-400">Alle Daten werden ausschließlich lokal in diesem Browser gespeichert. Zum Übertragen auf ein anderes Gerät die YAML-Datei exportieren und dort importieren.</p>
+    <p class="mt-6 text-xs text-neutral-400 print:hidden">Alle Daten werden ausschließlich lokal in diesem Browser gespeichert. Zum Übertragen auf ein anderes Gerät die YAML-Datei exportieren und dort importieren.</p>
   </main>
 </template>

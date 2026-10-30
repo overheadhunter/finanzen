@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
-/* keep diagram colors when printing */
+/* print only the summary and the diagram (everything else carries `print:hidden`) on one A4 landscape page, keeping the colors;
+   the diagram lays itself out for the resulting 267mm × 180mm printable area minus the summary row (see PRINT_ASPECT in SankeyDiagram.vue) */
+@page {
+  size: A4 landscape;
+  margin: 15mm;
+}
+
 @media print {
   * {
     -webkit-print-color-adjust: exact;
