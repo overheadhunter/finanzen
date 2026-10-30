@@ -77,7 +77,7 @@ export function layoutGraph(graph: Graph, options: LayoutOptions): Layout | null
   const available = height - 2 * marginY
   const ky = solveScale(root, nodePadding, available)
   measure(root, ky, nodePadding)
-  place(root, marginY + (available - root.row) / 2, ky, nodePadding, false)
+  place(root, marginY + (available - root.row) / 2, ky, nodePadding)
   attachLinks(bands, links, ky)
   return { nodes, links, lastColumn: graph.columnCount - 1 }
 }
@@ -163,46 +163,42 @@ function measure(band: Band, ky: number, padding: number): number {
   return band.row
 }
 
-// Bars and same-side stacks are centered in the band unless opposite-signed children must fit beside the parent lane. Then the lane goes to the edge of the band
-// that faces the parent's bar (top for "lane first", bottom for "lane last"), the bar and the own-side stack align with that edge, and the opposite stack takes the other side.
-// A centered bar splits its children in halves (upper half: lane last, lower half: lane first); an edge-aligned bar passes its own mode down.
-function place(band: Band, top: number, ky: number, padding: number, laneLast: boolean) {
+// The node's `align` (decided in buildGraph) says where its bar sits in the band: centered, or at the edge that faces the parent's bar ("top" = lane first,
+// "bottom" = lane last). The own-side stack aligns the same way; opposite-signed children take the other side of the parent lane.
+function place(band: Band, top: number, ky: number, padding: number) {
   const { own, opposite } = sides(band)
-  const mixed = opposite.length > 0
   const barHeight = band.bar * ky
-  band.laneLast = laneLast
-  const stack = (bands: Band[], start: number, modeOf: (index: number) => boolean) => {
+  const align = band.node.align
+  band.laneLast = align === 'bottom'
+  const stack = (bands: Band[], start: number) => {
     let cursor = start
-    bands.forEach((child, i) => {
-      place(child, cursor, ky, padding, modeOf(i))
+    for (const child of bands) {
+      place(child, cursor, ky, padding)
       cursor += child.row + padding
-    })
+    }
   }
-  const halves = (bands: Band[]) => (i: number) => i < (bands.length - 1) / 2
   if (!band.parentLink) {
     band.node.y0 = top + (band.row - barHeight) / 2
     band.node.y1 = band.node.y0 + barHeight
-    stack(band.left, top + (band.row - stackHeight(band.left, padding)) / 2, halves(band.left))
-    stack(band.right, top + (band.row - stackHeight(band.right, padding)) / 2, halves(band.right))
-    return
-  }
-  if (!mixed) {
-    band.node.y0 = top + (band.row - barHeight) / 2
-    band.node.y1 = band.node.y0 + barHeight
-    stack(own, top + (band.row - stackHeight(own, padding)) / 2, halves(own))
+    stack(band.left, top + (band.row - stackHeight(band.left, padding)) / 2)
+    stack(band.right, top + (band.row - stackHeight(band.right, padding)) / 2)
     return
   }
   const laneHeight = band.parentLink.value * ky
-  if (laneLast) {
+  if (align === 'center') {
+    band.node.y0 = top + (band.row - barHeight) / 2
+    band.node.y1 = band.node.y0 + barHeight
+    stack(own, top + (band.row - stackHeight(own, padding)) / 2)
+  } else if (align === 'bottom') {
     band.node.y1 = top + band.row
     band.node.y0 = band.node.y1 - barHeight
-    stack(own, top + band.row - stackHeight(own, padding), () => true)
-    stack(opposite, top, () => true)
+    stack(own, top + band.row - stackHeight(own, padding))
+    stack(opposite, top)
   } else {
     band.node.y0 = top
     band.node.y1 = band.node.y0 + barHeight
-    stack(own, top, () => false)
-    stack(opposite, top + laneHeight + padding, () => false)
+    stack(own, top)
+    stack(opposite, top + laneHeight + padding)
   }
 }
 

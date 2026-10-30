@@ -52,19 +52,41 @@ describe('buildGraph', () => {
   it('keeps nested negative subtrees of an income category left of the center', () => {
     const yaml = '_data:\n  income:\n    work:\n      salary: 2000\n      commute:\n        fuel: -100\n  rent: -500\n'
     const graph = buildGraph(parseDocument(yaml))
+    // work is income's only (hence outermost) own child, so the commute subtree moves up to share income's column with its deepest level
     expect(columnsOf(graph)).toEqual({
       'income › work › salary': 0,
       'income › work': 1,
       'income › work › commute': 2,
       'income › work › commute › fuel': 3,
-      income: 4,
-      [CENTER_ID]: 5,
-      [BALANCE_ID]: 6,
-      rent: 6,
+      income: 3,
+      [CENTER_ID]: 4,
+      [BALANCE_ID]: 5,
+      rent: 5,
     })
-    expect(graph.columnCount).toBe(7)
-    // the link from work to income spans the columns of the commute subtree
+    expect(graph.columnCount).toBe(6)
+    // the link from work to income spans the column of the commute node
     expect(graph.links).toContainEqual(expect.objectContaining({ source: 'income › work', target: 'income', value: 1900 }))
+  })
+
+  it('lets opposite-signed leaves share the grandparent column when the lane is outermost on an edge-aligned bar', () => {
+    // Sebi is top-aligned (it has PKV below its lane); Netto is its only own child with leaf deductions, so they move into Sebi's column
+    const graph = buildGraph(parseDocument('_data:\n  Sebi:\n    Netto:\n      Abr: 6000\n      bAV: -600\n    PKV: -700\n'))
+    expect(columnsOf(graph)).toEqual({ 'Sebi › Netto › Abr': 0, 'Sebi › Netto': 1, 'Sebi › Netto › bAV': 2, Sebi: 2, 'Sebi › PKV': 3, [CENTER_ID]: 4, [BALANCE_ID]: 5 })
+    const alignOf = Object.fromEntries(graph.nodes.map((n) => [n.id, n.align]))
+    expect(alignOf).toMatchObject({ Sebi: 'top', 'Sebi › Netto': 'top', 'Sebi › Netto › Abr': 'center', [CENTER_ID]: 'center' })
+    // a deeper deduction subtree shares the column with its deepest level only; a parent whose bar is centered never shares
+    const nested = buildGraph(parseDocument('_data:\n  Sebi:\n    Netto:\n      Abr: 6000\n      bAV:\n        x: -600\n    PKV: -700\n'))
+    expect(columnsOf(nested)).toMatchObject({ 'Sebi › Netto › Abr': 0, 'Sebi › Netto': 1, 'Sebi › Netto › bAV': 2, 'Sebi › Netto › bAV › x': 3, Sebi: 3, 'Sebi › PKV': 4 })
+    const centered = buildGraph(parseDocument('_data:\n  income:\n    work:\n      salary: 2000\n      commute: -100\n    other: 50\n'))
+    expect(columnsOf(centered)).toMatchObject({ 'income › work › salary': 0, 'income › work': 1, 'income › work › commute': 2, 'income › other': 2, income: 3 })
+    expect(Object.fromEntries(centered.nodes.map((n) => [n.id, n.align]))).toMatchObject({ income: 'center', 'income › work': 'bottom', 'income › other': 'center' })
+  })
+
+  it('aligns a centered parent with its only child when that child is edge-aligned', () => {
+    const graph = buildGraph(parseDocument('_data:\n  income:\n    work:\n      salary: 2000\n      commute: -100\n  rent: -500\n'))
+    expect(Object.fromEntries(graph.nodes.map((n) => [n.id, n.align]))).toMatchObject({ income: 'top', 'income › work': 'top', rent: 'center' })
+    // income inherits the edge alignment, so work shares income's column with its commute leaf
+    expect(columnsOf(graph)).toMatchObject({ 'income › work › salary': 0, 'income › work': 1, 'income › work › commute': 2, income: 2, [CENTER_ID]: 3 })
   })
 
   it('skips zero leaves and returns an empty graph without amounts', () => {

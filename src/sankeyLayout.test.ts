@@ -75,14 +75,16 @@ describe('layoutGraph', () => {
     const layout = layoutGraph(graph, options)!
     const node = (id: string) => layout.nodes.find((n) => n.id === id)!
     expect(node('income › work').x1).toBeLessThan(node('income › work › commute').x0!)
-    expect(node('income › work › commute › fuel').x1).toBeLessThan(node('income').x0!)
-    // the work → income lane leaves work at the top of its bar, runs straight above the commute subtree and only bends after the subtree's last column
+    // the deepest level of the commute subtree shares income's column, vertically clear of income's bar
+    expect(node('income › work › commute › fuel').x0).toBe(node('income').x0)
+    expect(node('income › work › commute › fuel').y0).toBeGreaterThanOrEqual(node('income').y1 + options.nodePadding - 1e-6)
+    // the work → income lane leaves work at the top of its bar, runs straight above the commute subtree and only bends after the commute column
     const lane = layout.links.find((l) => l.node === 'income › work')!
     const laneBottom = lane.y0 + lane.width / 2
     for (const id of ['income › work › commute', 'income › work › commute › fuel']) {
       expect(node(id).y0).toBeGreaterThanOrEqual(laneBottom + options.nodePadding - 1e-6)
     }
-    expect(lane.bend[0]).toBeGreaterThanOrEqual(node('income › work › commute › fuel').x1)
+    expect(lane.bend[0]).toBeGreaterThanOrEqual(node('income › work › commute').x1)
     expect(lane.bend[1]).toBe(node('income').x0)
     expect(linkPath(lane)).toMatch(/^M[\d.]+,[\d.]+H[\d.]+C/)
     // a negative lane fans out right after its parent and then runs straight
