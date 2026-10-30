@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { sankeyLinkHorizontal } from 'd3-sankey'
 import { formatAmount } from '../format'
 import type { Settings } from '../model'
-import type { Graph, GraphLink, GraphNode } from '../sankeyGraph'
-import { endpoint, layoutGraph, type LayoutLink, type LayoutNode } from '../sankeyLayout'
+import type { Graph } from '../sankeyGraph'
+import { layoutGraph, leafRows, linkPath, type LayoutLink, type LayoutNode } from '../sankeyLayout'
 
 const props = defineProps<{
   graph: Graph
@@ -36,17 +35,13 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 
-const height = computed(() => {
-  const perColumn = new Map<number, number>()
-  for (const n of props.graph.nodes) perColumn.set(n.column, (perColumn.get(n.column) ?? 0) + 1)
-  return Math.max(MIN_HEIGHT, Math.max(0, ...perColumn.values()) * ROW_HEIGHT + 2 * MARGIN_Y)
-})
+// every leaf gets a row on its side of the diagram, so the band layout has room for bars and padding
+const height = computed(() => Math.max(MIN_HEIGHT, leafRows(props.graph) * ROW_HEIGHT + 2 * MARGIN_Y))
 
 const layout = computed(() =>
   layoutGraph(props.graph, { width: width.value, height: height.value, marginX: MARGIN_X, marginY: MARGIN_Y, nodeWidth: NODE_WIDTH, nodePadding: NODE_PADDING }),
 )
 
-const linkPath = sankeyLinkHorizontal<GraphNode, GraphLink>()
 
 // hovering takes precedence over the editor-driven highlight
 const active = computed(() => hovered.value ?? props.highlighted ?? null)
@@ -56,9 +51,20 @@ function isCategory(id: string): boolean {
   return categoryIds.value.has(id)
 }
 
+// segments of a spanning lane end at invisible waypoints, so highlighting and tooltips refer to the original link, found via its `node`
+const originalLinks = computed(() => new Map(props.graph.links.map((l) => [l.node, l])))
+const nodeNames = computed(() => new Map(props.graph.nodes.map((n) => [n.id, n.name])))
+
 function linkOpacity(link: LayoutLink): number {
   if (active.value === null) return 0.45
-  return endpoint(link.source).id === active.value || endpoint(link.target).id === active.value ? 0.85 : 0.12
+  const original = originalLinks.value.get(link.node)
+  return original?.source === active.value || original?.target === active.value ? 0.85 : 0.12
+}
+
+function linkTitle(link: LayoutLink): string {
+  const original = originalLinks.value.get(link.node)
+  if (!original) return ''
+  return `${nodeNames.value.get(original.source)} → ${nodeNames.value.get(original.target)}: ${formatAmount(original.value, props.settings)}`
 }
 
 // the center label sits above its node; income labels sit right of the node, expense labels left of it
@@ -73,19 +79,18 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
 <template>
   <div ref="container" class="w-full">
     <svg v-if="layout" :viewBox="`0 0 ${width} ${height}`" :width="width" :height="height" class="block select-none text-xs">
-      <g fill="none">
+      <g>
         <path
           v-for="(link, i) in layout.links"
           :key="i"
-          :d="linkPath(link) ?? undefined"
-          :style="{ stroke: link.color, strokeOpacity: linkOpacity(link) }"
-          :stroke-width="Math.max(1, link.width ?? 1)"
+          :d="linkPath(link)"
+          :style="{ fill: link.color, fillOpacity: linkOpacity(link) }"
           :class="['transition-opacity duration-150', isCategory(link.node) ? 'cursor-pointer' : '']"
           @mouseenter="hovered = link.node"
           @mouseleave="hovered = null"
           @click="isCategory(link.node) && emit('select', link.node)"
         >
-          <title>{{ endpoint(link.source).name }} → {{ endpoint(link.target).name }}: {{ formatAmount(link.value, settings) }}</title>
+          <title>{{ linkTitle(link) }}</title>
         </path>
       </g>
       <g

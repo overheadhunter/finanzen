@@ -44,9 +44,27 @@ describe('buildGraph', () => {
 
   it('flows opposite-signed children back towards the parent', () => {
     const graph = buildGraph(parseDocument('_data:\n  tax:\n    income tax: -500\n    refund: 100\n'))
-    expect(columnsOf(graph)).toEqual({ [BALANCE_ID]: 0, [CENTER_ID]: 1, 'tax › refund': 1, tax: 2, 'tax › income tax': 3 })
+    expect(columnsOf(graph)).toEqual({ [BALANCE_ID]: 0, [CENTER_ID]: 1, 'tax › refund': 2, tax: 3, 'tax › income tax': 4 })
     expect(graph.links).toContainEqual(expect.objectContaining({ source: 'tax › refund', target: 'tax', value: 100 }))
     expect(graph.links).toContainEqual(expect.objectContaining({ source: CENTER_ID, target: 'tax', value: 400 }))
+  })
+
+  it('keeps nested negative subtrees of an income category left of the center', () => {
+    const yaml = '_data:\n  income:\n    work:\n      salary: 2000\n      commute:\n        fuel: -100\n  rent: -500\n'
+    const graph = buildGraph(parseDocument(yaml))
+    expect(columnsOf(graph)).toEqual({
+      'income › work › salary': 0,
+      'income › work': 1,
+      'income › work › commute': 2,
+      'income › work › commute › fuel': 3,
+      income: 4,
+      [CENTER_ID]: 5,
+      [BALANCE_ID]: 6,
+      rent: 6,
+    })
+    expect(graph.columnCount).toBe(7)
+    // the link from work to income spans the columns of the commute subtree
+    expect(graph.links).toContainEqual(expect.objectContaining({ source: 'income › work', target: 'income', value: 1900 }))
   })
 
   it('skips zero leaves and returns an empty graph without amounts', () => {
