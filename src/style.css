@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* keep diagram colors when printing */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
