@@ -28,6 +28,8 @@ export interface Category {
 export interface Settings {
   version: number
   currencySymbol: string
+  /** Number of fraction digits when displaying amounts. */
+  decimals: number
 }
 
 export interface FinanceDocument {

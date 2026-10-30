@@ -1,8 +1,9 @@
 import { isMap, isNode, isScalar, parseDocument as parseYaml, type Document, type Node, type Pair, type YAMLMap } from 'yaml'
-import type { Category, FinanceDocument, Settings, TextRange } from './model'
+import { allCategories, type Category, type FinanceDocument, type Settings, type TextRange } from './model'
 
 export const SUPPORTED_VERSION = 1
 export const DEFAULT_CURRENCY_SYMBOL = '€'
+export const DEFAULT_DECIMALS = 2
 export const FILE_EXTENSION = '.yaml'
 /** Separator between the keys of a nested path, e.g. `income › work › salary`. */
 export const PATH_SEPARATOR = ' › '
@@ -29,7 +30,7 @@ export function parseDocument(text: string): FinanceDocument {
 }
 
 function defaultSettings(): Settings {
-  return { version: SUPPORTED_VERSION, currencySymbol: DEFAULT_CURRENCY_SYMBOL }
+  return { version: SUPPORTED_VERSION, currencySymbol: DEFAULT_CURRENCY_SYMBOL, decimals: DEFAULT_DECIMALS }
 }
 
 function parseSettings(raw: unknown): Settings {
@@ -46,6 +47,11 @@ function parseSettings(raw: unknown): Settings {
       if (typeof raw.currency.symbol !== 'string') throw new Error('„_settings.currency.symbol“ muss ein Text sein.')
       settings.currencySymbol = raw.currency.symbol
     }
+    const decimals = raw.currency.decimals
+    if (decimals != null) {
+      if (typeof decimals !== 'number' || !Number.isInteger(decimals) || decimals < 0 || decimals > 20) throw new Error('„_settings.currency.decimals“ muss eine ganze Zahl zwischen 0 und 20 sein.')
+      settings.decimals = decimals
+    }
   }
   return settings
 }
@@ -56,8 +62,9 @@ function parseCategory(doc: Document, pair: Pair<unknown, unknown>, path: string
   const base = { key, name: key, path, range: rangeOf(pair), keyRange: isNode(pair.key) ? scalarRange(pair.key) : rangeOf(pair) }
   if (value == null || (isScalar(value) && value.value == null)) return { ...base, total: 0, children: [] }
   if (isScalar(value)) {
-    if (typeof value.value !== 'number' || !Number.isFinite(value.value)) throw new Error(`„${path}“ muss ein endlicher Betrag sein.`)
-    return { ...base, amount: value.value, total: value.value, children: [], valueRange: scalarRange(value) }
+    const amount = toAmount(value.value)
+    if (amount === undefined) throw new Error(`„${path}“ muss ein endlicher Betrag sein.`)
+    return { ...base, amount, total: amount, children: [], valueRange: scalarRange(value) }
   }
   if (!isMap(value)) throw new Error(`„${path}“ muss ein Betrag oder eine Map aus Unterkategorien sein.`)
   const settingsPair = findPair(value, '_settings')
@@ -66,7 +73,55 @@ function parseCategory(doc: Document, pair: Pair<unknown, unknown>, path: string
   if (children.length > 0) return { ...base, name: name ?? key, total: children.reduce((sum, c) => sum + c.total, 0), children }
   if (amount === undefined) return { ...base, name: name ?? key, total: 0, children }
   const valueNode = isMap(settingsPair?.value) ? findPair(settingsPair.value, 'value')?.value : undefined
-  return { ...base, name: name ?? key, amount, total: amount, children, valueRange: isNode(valueNode) ? scalarRange(valueNode) : undefined }
+  if (!isScalar(valueNode)) return { ...base, name: name ?? key, amount, total: amount, children }
+  return { ...base, name: name ?? key, amount, total: amount, children, valueRange: scalarRange(valueNode) }
+}
+
+/**
+ * Rewrites every amount literal into its canonical form (see {@link formatYamlAmount}): autocorrected literals like `1.234,56` become `1234.56`, and valid numbers are padded to the configured decimals, e.g. `2.5` → `2.50`.
+ *
+ * Literals on the line that contains the cursor are left alone, so a number still being typed is not rewritten underneath the cursor.
+ *
+ * @param text YAML source
+ * @param cursor caret offset into `text`, or a negative value if the editor is not focused
+ * @return the corrected source (unchanged if nothing needs correcting or the document is invalid) and the caret offset shifted by the edits before it
+ */
+export function normalizeAmounts(text: string, cursor = -1): { text: string; cursor: number } {
+  let doc: FinanceDocument
+  try {
+    doc = parseDocument(text)
+  } catch {
+    return { text, cursor }
+  }
+  const lineStart = cursor < 0 ? -1 : text.lastIndexOf('\n', cursor - 1) + 1
+  const lineEnd = cursor < 0 ? -1 : (text.indexOf('\n', cursor) + 1 || text.length + 1)
+  const corrections = [...allCategories(doc)]
+    .filter((c) => c.valueRange && c.amount !== undefined)
+    .filter((c) => c.valueRange!.start < lineStart || c.valueRange!.start >= lineEnd)
+    .map((c) => ({ ...c.valueRange!, replacement: formatYamlAmount(c.amount!, doc.settings.decimals) }))
+    .filter((c) => text.slice(c.start, c.end) !== c.replacement)
+    .sort((a, b) => b.start - a.start)
+  let result = text
+  let shifted = cursor
+  for (const { start, end, replacement } of corrections) {
+    result = result.slice(0, start) + replacement + result.slice(end)
+    if (end <= cursor) shifted += replacement.length - (end - start)
+  }
+  return { text: result, cursor: shifted }
+}
+
+/**
+ * Formats an amount as a YAML number literal: integers without fraction digits, everything else with at least `decimals` fraction digits (more if the value is more precise).
+ *
+ * @param amount the amount
+ * @param decimals minimum fraction digits for non-integers
+ * @return the literal, e.g. `3`, `2.50` or `1234.567` for `decimals = 2`
+ */
+export function formatYamlAmount(amount: number, decimals: number): string {
+  if (Number.isInteger(amount)) return String(amount)
+  const plain = String(amount)
+  const fraction = plain.split('.')[1]?.length ?? 0
+  return fraction < decimals && !plain.includes('e') ? amount.toFixed(decimals) : plain
 }
 
 // `_settings.value` carries the amount of a category without subcategories; with subcategories it is ignored
@@ -79,10 +134,36 @@ function parseCategorySettings(raw: unknown, path: string): { name?: string; amo
     result.name = raw.displayname
   }
   if (raw.value != null) {
-    if (typeof raw.value !== 'number' || !Number.isFinite(raw.value)) throw new Error(`„${path}“: „_settings.value“ muss ein endlicher Betrag sein.`)
-    result.amount = raw.value
+    const amount = toAmount(raw.value)
+    if (amount === undefined) throw new Error(`„${path}“: „_settings.value“ muss ein endlicher Betrag sein.`)
+    result.amount = amount
   }
   return result
+}
+
+// numbers pass through; strings (e.g. `1.234,56`, which YAML does not parse as a number) are autocorrected
+function toAmount(raw: unknown): number | undefined {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : undefined
+  if (typeof raw === 'string') return coerceAmount(raw)
+  return undefined
+}
+
+/**
+ * Interprets a non-YAML number literal as an amount, tolerating locale-specific separators.
+ *
+ * Whitespace is removed, non-digit characters are trimmed from both ends (a leading sign is kept), all remaining non-digit characters except the last one are dropped, and the last one is treated as the decimal separator. So `1.234,56` and `1,234.56` both become 1234.56, `-1.234,56 €` becomes -1234.56 and `-1 000` becomes -1000.
+ *
+ * @param text the literal
+ * @return the amount, or `undefined` if the text contains no digits
+ */
+export function coerceAmount(text: string): number | undefined {
+  const compact = text.replace(/\s+/g, '')
+  const sign = compact.startsWith('-') ? -1 : 1
+  const trimmed = compact.replace(/^\D+/, '').replace(/\D+$/, '')
+  if (trimmed === '') return undefined
+  const separator = trimmed.search(/\D\d*$/)
+  const digits = separator === -1 ? trimmed : `${trimmed.slice(0, separator).replace(/\D/g, '')}.${trimmed.slice(separator + 1)}`
+  return sign * Number(digits)
 }
 
 // keys starting with `_` are reserved for metadata and never represent categories

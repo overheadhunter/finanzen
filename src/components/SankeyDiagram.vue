@@ -2,12 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sankeyLinkHorizontal } from 'd3-sankey'
 import { formatAmount } from '../format'
+import type { Settings } from '../model'
 import type { Graph, GraphLink, GraphNode } from '../sankeyGraph'
 import { endpoint, layoutGraph, type LayoutLink, type LayoutNode } from '../sankeyLayout'
 
 const props = defineProps<{
   graph: Graph
-  currencySymbol: string
+  settings: Pick<Settings, 'currencySymbol' | 'decimals'>
   /** Id of the node to emphasize, e.g. the category under the editor's cursor. */
   highlighted?: string | null
 }>()
@@ -84,7 +85,7 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
           @mouseleave="hovered = null"
           @click="isCategory(link.node) && emit('select', link.node)"
         >
-          <title>{{ endpoint(link.source).name }} → {{ endpoint(link.target).name }}: {{ formatAmount(link.value, currencySymbol) }}</title>
+          <title>{{ endpoint(link.source).name }} → {{ endpoint(link.target).name }}: {{ formatAmount(link.value, settings) }}</title>
         </path>
       </g>
       <g
@@ -104,11 +105,11 @@ function labelAnchor(n: LayoutNode): { x: number; y: number; anchor: 'start' | '
           :class="node.id === highlighted ? 'stroke-neutral-900 stroke-2' : ''"
           rx="2"
         >
-          <title>{{ node.id }}: {{ formatAmount(node.amount, currencySymbol) }}</title>
+          <title>{{ node.id }}: {{ formatAmount(node.amount, settings) }}</title>
         </rect>
         <text :x="labelAnchor(node).x" :y="labelAnchor(node).y" :text-anchor="labelAnchor(node).anchor" dominant-baseline="middle" class="label">
           <tspan :class="node.id === highlighted ? 'font-bold' : 'font-medium'">{{ node.name }}</tspan>
-          <tspan dx="0.4em" class="fill-neutral-500">{{ formatAmount(node.amount, currencySymbol) }}</tspan>
+          <tspan dx="0.4em" class="fill-neutral-500">{{ formatAmount(node.amount, settings) }}</tspan>
         </text>
       </g>
     </svg>
